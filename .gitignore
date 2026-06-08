@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+.venv/
+venv/
+__pycache__/
+
+# Builds
+dist/
+build/
+.next/
+out/
+
+# Local config
+.env
+.env.*
+!.env.example
+
+# Generated assets
+uploads/
+derived/
+models/
+renders/
+
+# System files
+.DS_Store
