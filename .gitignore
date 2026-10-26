@@ -9,11 +9,13 @@ dist/
 build/
 .next/
 out/
+coverage/
 
 # Local config
 .env
 .env.*
 !.env.example
+.data/
 
 # Generated assets
 uploads/
@@ -23,3 +25,13 @@ renders/
 
 # System files
 .DS_Store
+
+# Local QA and release media (may contain personal media and absolute paths)
+.playwright-mcp/
+.artifacts/
+test-results/
+playwright-report/
+*.sqlite
+*.sqlite-*
+*.db
+*.log

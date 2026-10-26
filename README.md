@@ -1,89 +1,95 @@
 # AI Cloned Pet
 
-Private prototype repo for cloning a real pet from user photos/videos into an interactive 3D AI pet.
+Turn your pet's photos into a cartoon companion that reacts in your browser.
 
-## Product Goal
+[简体中文](README.zh-CN.md) · [Roadmap](docs/ROADMAP.md) · [Contributing](CONTRIBUTING.md)
 
-Users upload photos and short videos of a cat or dog. The system creates a personalized 3D pet that resembles the original pet closely enough for emotional use, then lets the user interact with it in a 3D scene through touch, voice, sounds, and conversation.
+**Experimental alpha.** Photo-to-avatar generation and browser interactions work, but animation quality is still being developed. The generator currently creates nine pose images and builds 72 cells using image transforms; these are not 72 independently animated poses. This is a 2D companion, not a 3D reconstruction or a clone of an animal's personality.
 
-## Core Experience
+## What You Can Do
 
-- Upload 5-20 clear photos or a 20-60 second video around the pet.
-- Build a pet identity profile: appearance, markings, size, breed hints, name, personality notes, sound samples when available.
-- Generate a 3D asset with fur color, markings, face, body proportions, and texture detail.
-- Rig the asset for animation: idle, walk, run, sit, lie down, jump, bark/meow, tail, ear, head, and reaction motions.
-- Run a real-time interaction loop in a browser or app: user taps/strokes/calls the pet, the LLM selects actions, animation/audio systems execute them.
+- Bring your own pet photos, or extract still frames from a video with ffmpeg.
+- Generate a cartoon avatar in storybook, toy-like, pixel, or ink styles.
+- Click the stage to move the companion, touch it for a reaction, and use local text commands.
+- Reuse cached sprites without calling an image model during ordinary interaction.
+- Switch between Chinese (default) and English.
+- Keep records in local SQLite, export metadata, and delete uploaded media.
 
-## Recommended Architecture
+No API keys, uploaded pets, generated avatars, or seeded sample data are included. A fresh install starts empty. Audio uploads are stored; voice cloning and audio understanding are not implemented.
 
-### 1. Media Ingestion
+## Quick Start
 
-- Store original uploads separately from derived assets.
-- Run quality checks for blur, pet visibility, occlusion, lighting, and duplicate frames.
-- Extract keyframes from video and segment the pet from the background.
-- Keep explicit consent and delete/export controls because users may upload personal household footage.
+Requires **Node.js 24**, npm, and ffmpeg on PATH for video uploads. Start with photos if ffmpeg is unavailable.
 
-### 2. Pet Reconstruction Pipeline
-
-Use two modes:
-
-- MVP mode: segment the pet, generate a textured mesh from the best front/side images, then manually or semi-automatically refine rigging.
-- High-similarity mode: use multi-view frames or video reconstruction, then preserve identity with texture projection and likeness scoring.
-
-The important point is that a generic "cute dog/cat" generator is not enough. The pipeline must preserve subject-specific features: face shape, coat pattern, eye color, body proportions, scars, collar, and unusual markings.
-
-### 3. Asset Format
-
-- Runtime asset: `glTF/GLB` for mesh, materials, skeleton, and animation clips.
-- Optional high-fidelity preview: Gaussian splat or neural rendering asset for likeness review.
-- Store generated versions so the user can compare and approve before the pet enters the interactive scene.
-
-### 4. Interaction Runtime
-
-- Frontend 3D: Three.js or React Three Fiber.
-- Animation: finite-state machine plus blendable clips.
-- Touch input: raycast hit zones for head, back, belly, paw, tail, and face.
-- LLM action planner: converts user intent and current pet state into structured action JSON.
-- Audio: recorded pet samples when available, generated bark/meow variants when not, and speech/TTS for conversation mode.
-
-Example planner output:
-
-```json
-{
-  "emotion": "happy",
-  "actions": [
-    { "type": "animation", "name": "tail_wag", "intensity": 0.8 },
-    { "type": "sound", "name": "soft_bark" },
-    { "type": "move_to", "target": "near_user", "speed": "slow" }
-  ],
-  "reply": "I missed you. Can we play?"
-}
+```bash
+git clone https://github.com/eust-w/ai-cloned-pet.git
+cd ai-cloned-pet
+npm ci
+cp .env.example .env
+npm run dev
 ```
 
-### 5. Similarity QA
+Open http://127.0.0.1:5173. The API listens on http://127.0.0.1:4000. Create a pet, confirm media consent, upload photos, then configure a provider to generate an avatar. Never put a provider key into client-side code.
 
-Treat likeness as a product requirement, not a nice-to-have.
+`npm run build` builds both components. `npm start` starts the compiled **API only**; use `npm run preview` in another terminal to preview the built web app locally.
 
-- Compare source images against rendered views from the generated pet.
-- Score coat pattern, face, proportions, and key identity marks separately.
-- Reject or ask for more photos when confidence is low.
-- Keep a human-in-the-loop review path for the first version; fully automatic cloning will need more validation data.
+## Providers And Cost
 
-## MVP Milestones
+Configure your own provider in `.env`. For DashScope/Bailian, a configuration can look like this; choose models and an endpoint enabled for your account and region:
 
-1. Upload flow with image/video validation.
-2. Pet segmentation and best-frame extraction.
-3. Single-pet 3D asset generation into GLB.
-4. Browser 3D viewer with orbit camera and basic animations.
-5. Interaction controller for petting/calling/tapping.
-6. LLM planner that emits structured actions.
-7. Voice/sound layer.
-8. Likeness scoring and regeneration loop.
+```dotenv
+OPENAI_API_KEY=
+OPENAI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
+OPENAI_MODEL=qwen-plus
+OPENAI_VISION_MODEL=qwen-vl-plus
+OPENAI_IMAGE_MODEL=wan2.6-image
+```
 
-## Technical Risks
+OpenAI-compatible chat/vision and image-edit integrations are also present. Compatible chat endpoints do not necessarily support image editing. Model access and pricing are controlled by the provider.
 
-- High likeness is hard from only one image; ask for multi-angle media early.
-- Fur and fine markings are difficult to rig cleanly; start with texture fidelity before dynamic fur simulation.
-- Gaussian splats can look very similar but are harder to animate like a normal skeleton mesh.
-- Generated sounds and "dialogue as the pet" should be presented carefully so the user understands it is an AI companion, not the real animal.
+| Operation | Provider calls |
+| --- | --- |
+| Upload photos / extract video frames | None |
+| Identity analysis | Vision request with selected images |
+| Generate or regenerate an avatar | Currently **9 image requests**, one per pose |
+| Idle, stage click, touch, local text commands | None |
+| Text command with LLM enabled | Chat request |
 
+Uploads are stored locally. Analysis sends selected images to the configured vision provider; generation sends a reference image to the image provider. LLM planning sends the profile and message. Generated assets are downloaded and cached locally. Generation is not free; cached playback avoids repeated inference charges.
+
+## Current Limits
+
+- Pose transforms cannot substitute for articulated walking, blinking, or tail motion. Matte quality and identity consistency still vary.
+- The fallback photo atlas assigns photos to action slots; it does not recognize their actions.
+- Local commands are rule-based; arbitrary conversational understanding requires the optional LLM.
+- This is a local, single-user app with no authentication, billing limits, or background generation queue. Do not expose the API to the internet as a multi-user service.
+- 3D routes are disabled and return `410 THREE_D_DISABLED`.
+- JSON export contains metadata and file URLs, not a self-contained media backup.
+
+See [release gates](docs/ROADMAP.md) before announcing a stable release. This independent project is not an official OpenAI/Codex product. Matching atlas dimensions do not imply verified Codex Pet import compatibility.
+
+## Development And Verification
+
+```bash
+npm run typecheck
+npm run lint
+npm test
+npm run build
+npm audit
+```
+
+Real integration test, against a running API and your own files:
+
+```bash
+COCO_TEST_MEDIA="/absolute/pet-video.mp4;/absolute/pet-photo.jpg" npm run test:real:coco
+```
+
+Add `REAL_TEST_ANALYZE=1` for paid vision analysis or `REAL_TEST_AVATAR=1` for a paid nine-image generation run. Provider tests are opt-in; CI does not spend API credits. Dimensions and HTTP status checks do **not** prove visual animation quality.
+
+## Architecture
+
+React/Vite → Fastify → SQLite and local media storage. ffmpeg extracts video frames; sharp handles image validation and atlas assembly. The server integrates vision, image generation, and optional LLM planning. The browser plays cached assets and handles local input.
+
+## License
+
+Code and project documentation: [MIT](LICENSE). Dependencies retain their own licenses. User uploads, model outputs, and local promotional media are **not** granted by the code license; see [asset policy](docs/ASSETS.md).
