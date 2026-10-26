@@ -80,7 +80,19 @@ try {
       await expect(page.getByRole("checkbox", { name: "LLM", exact: true })).not.toBeChecked();
       await input.fill("坐下休息");
       const responsePromise = page.waitForResponse((response) => response.url().endsWith("/interactions") && response.request().method() === "POST");
-      const restBefore = await readPosition();
+      await stage.evaluate((element) => {
+        let previous = { x: parseFloat(element.style.getPropertyValue("--pet-x")), y: parseFloat(element.style.getPropertyValue("--pet-y")), time: performance.now() };
+        element.dataset.unexpectedJump = "0";
+        const observer = new MutationObserver(() => {
+          const current = { x: parseFloat(element.style.getPropertyValue("--pet-x")), y: parseFloat(element.style.getPropertyValue("--pet-y")), time: performance.now() };
+          const distance = Math.hypot(current.x - previous.x, current.y - previous.y);
+          const allowance = (current.time - previous.time) / 1000 * 150 + 8;
+          element.dataset.unexpectedJump = String(Math.max(Number(element.dataset.unexpectedJump), distance - allowance));
+          previous = current;
+        });
+        observer.observe(element, { attributes: true, attributeFilter: ["style"] });
+        setTimeout(() => observer.disconnect(), 15000);
+      });
       await page.locator(".planner-form button").click();
       const response = await responsePromise;
       assert.equal(response.status(), 200);
@@ -90,7 +102,7 @@ try {
       await stage.scrollIntoViewIfNeeded();
       await expect(sprite).toHaveAttribute("aria-label", "坐下");
       const restAfter = await readPosition();
-      assert(Math.hypot(restAfter.x - restBefore.x, restAfter.y - restBefore.y) < 30, "A command must not teleport the pet");
+      assert.equal(await stage.getAttribute("data-unexpected-jump"), "0", "A command must not teleport the pet");
       await page.waitForTimeout(4200);
       const rested = await readPosition();
       assert(Math.hypot(rested.x - restAfter.x, rested.y - restAfter.y) < 2, "Rest must suspend autonomous travel");
